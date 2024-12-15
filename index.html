@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>휘매쓰 연산 챌린지!</title>
+<!-- MathJax -->
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" id="MathJax-script" async></script>
+<style>
+  body {
+    font-family: sans-serif;
+    background: #f0f0f0;
+    margin:0;
+    padding:0;
+  }
+  #container {
+    width: 800px;
+    margin: auto;
+    background:#fff;
+    padding:20px;
+    box-shadow:0 0 10px rgba(0,0,0,0.1);
+    position: relative;
+  }
+  h1 {
+    text-align:center;
+  }
+  .difficulty-select button {
+    margin:10px;
+    font-size:16px;
+    padding:10px 20px;
+    cursor:pointer;
+  }
+  #game-area {
+    display:none;
+  }
+  .energy-bar {
+    width:100%;
+    height:20px;
+    background:#ddd;
+    margin-bottom:10px;
+    position:relative;
+    overflow:hidden;
+  }
+  .energy-inner {
+    width:100%;
+    height:100%;
+    background:linear-gradient(to right, #4caf50, #81c784);
+    transition:width 1s linear;
+  }
+  #score, #lives, #global-time {
+    font-size:16px;
+    margin:5px 0;
+  }
+  #problem {
+    font-size:18px;
+    margin:20px 0;
+  }
+  .choices {
+    margin:20px 0;
+  }
+  .choices button {
+    display:block;
+    width:100%;
+    text-align:left;
+    margin:5px 0;
+    font-size:16px;
+    padding:10px;
+    cursor:pointer;
+  }
+  #popup {
+    display:none;
+    position:fixed;
+    top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    background:#fff;
+    border:1px solid #333;
+    padding:20px;
+    z-index:9999;
+    max-width:400px;
+    word-break:break-word;
+  }
+  #popup button {
+    margin-top:10px;
+    cursor:pointer;
+  }
+</style>
+</head>
+<body>
+<div id="container">
+  <h1>휘매쓰 연산 챌린지!</h1>
+  <div id="intro">
+    <p>난이도를 선택해주세요:</p>
+    <div class="difficulty-select">
+      <button data-diff="top">최상(20초)</button>
+      <button data-diff="high">상(30초)</button>
+      <button data-diff="mid">중(40초)</button>
+      <button data-diff="low">하(무제한)</button>
+    </div>
+  </div>
+  
+  <div id="game-area">
+    <div class="energy-bar"><div class="energy-inner"></div></div>
+    <div id="score">점수: 0</div>
+    <div id="lives">남은 기회: 3</div>
+    <div id="global-time">총 경과 시간: 0초</div>
+    <div id="problem"></div>
+    <div class="choices" id="choices"></div>
+  </div>
+</div>
+
+<div id="popup">
+  <div id="popup-content"></div>
+  <button onclick="closePopup()">닫기</button>
+</div>
+
+<script>
+// 난이도별 설정
+var timeLimits = {top:20, high:30, mid:40, low:null};
+var scores = {top:20, high:15, mid:13, low:10};
+
+var problems = [
+  {
+    question:"\\(4^{-\frac{3}{4}}\\)",
+    instruction:"다음을 근호를 사용하여 나타내어라.",
+    correct:"\\(\\frac{1}{2\\sqrt{2}}\\)",
+    wrongs:["\\(2\\sqrt{2}\\)","\\(\\frac{1}{4}\\)","\\(\\frac{1}{2}\\)"]
+  },
+  {
+    question:"\\(\\left(\\frac{5}{2}\\right)^0 + \\left(\\frac{2}{3}\\right)^{-2}\\)",
+    instruction:"다음을 구하여라.",
+    correct:"\\(\\frac{13}{4}\\)",
+    wrongs:["\\(1\\)","\\(\\frac{5}{4}\\)","\\(\\frac{9}{4}\\)"]
+  },
+  {
+    question:"\\((-3)^0 - 2^{-2}\\)",
+    instruction:"다음을 구하여라.",
+    correct:"\\(\\frac{3}{4}\\)",
+    wrongs:["\\(1\\)","\\(\\frac{1}{4}\\)","\\(2\\)"]
+  },
+  {
+    question:"\\(\\left(\\frac{1}{9}\\right)^{-\frac{3}{4}}\\)",
+    instruction:"다음을 근호를 사용하여 나타내어라.",
+    correct:"\\(3\\sqrt{3}\\)",
+    wrongs:["\\(3\\)","\\(\\frac{1}{3\\sqrt{3}}\\)","\\(\\sqrt{3}\\)"]
+  },
+  {
+    question:"\\(2^{\\frac{2}{3}}\\)",
+    instruction:"다음을 근호를 사용하여 나타내어라.",
+    correct:"\\(\\sqrt[3]{4}\\)",
+    wrongs:["\\(\\sqrt{4}\\)","\\(\\sqrt[3]{2}\\)","\\(4\\)"]
+  },
+  {
+    question:"\\(11^{\\frac{2}{3}}\\)",
+    instruction:"다음을 근호를 사용하여 나타내어라.",
+    correct:"\\(\\sqrt[3]{121}\\)",
+    wrongs:["\\(\\sqrt{121}\\)","\\(\\sqrt[3]{11}\\)","\\(121\\)"]
+  },
+  {
+    question:"\\(5^{-\frac{3}{2}}\\)",
+    instruction:"다음을 근호를 사용하여 나타내어라.",
+    correct:"\\(\\frac{1}{5\\sqrt{5}}\\)",
+    wrongs:["\\(5\\sqrt{5}\\)","\\(\\frac{1}{25}\\)","\\(\\sqrt{5}\\)"]
+  },
+  {
+    question:"\\(\\left(\\frac{125}{64}\\right)^{\\frac{1}{6}}\\)",
+    instruction:"다음을 근호를 사용하여 나타내어라.",
+    correct:"\\(\\frac{\\sqrt{5}}{2}\\)",
+    wrongs:["\\(\\sqrt{5}\\)","\\(\\frac{1}{2}\\)","\\(\\frac{\\sqrt{2}}{5}\\)"]
+  },
+  {
+    question:"\\(\\left(\\frac{1}{32}\\right)^{\\frac{3}{10}}\\)",
+    instruction:"다음을 근호를 사용하여 나타내어라.",
+    correct:"\\(\\frac{1}{2\\sqrt{2}}\\)",
+    wrongs:["\\(2\\sqrt{2}\\)","\\(\\frac{1}{4}\\)","\\(\\sqrt{2}\\)"]
+  },
+  {
+    question:"\\((-\tfrac{1}{2})^{0}\\)",
+    instruction:"다음을 구하여라.",
+    correct:"\\(1\\)",
+    wrongs:["\\(-1\\)","\\(0\\)","\\(-\\frac{1}{2}\\)"]
+  },
+  {
+    question:"\\(4^{0} + (-5)^{0}\\)",
+    instruction:"다음을 구하여라.",
+    correct:"\\(2\\)",
+    wrongs:["\\(1\\)","\\(0\\)","\\(-1\\)"]
+  },
+  {
+    question:"\\(\\left(\\frac{1}{3}\\right)^{-2}\\)",
+    instruction:"다음을 구하여라.",
+    correct:"\\(9\\)",
+    wrongs:["\\(\\frac{1}{9}\\)","\\(3\\)","\\(-9\\)"]
+  },
+  {
+    question:"\\((-5)^{-2}\\)",
+    instruction:"다음을 구하여라.",
+    correct:"\\(\\frac{1}{25}\\)",
+    wrongs:["\\(25\\)","\\(-\\frac{1}{25}\\)","\\(-25\\)"]
+  },
+  {
+    question:"\\((-2)^{-3} + (-3)^{-2}\\)",
+    instruction:"다음을 구하여라.",
+    correct:"\\(-\\frac{1}{72}\\)",
+    wrongs:["\\(\\frac{1}{72}\\)","\\(-\\frac{1}{9}\\)","\\(-\\frac{1}{8} + \\frac{1}{9}\\)"]
+  },
+  {
+    question:"\\(\\left(\\frac{5}{2}\\right)^{0} + \\left(\\frac{2}{3}\\right)^{-2}\\)",
+    instruction:"다음을 구하여라.",
+    correct:"\\(\\frac{13}{4}\\)",
+    wrongs:["\\(1\\)","\\(\\frac{5}{4}\\)","\\(\\frac{9}{4}\\)"]
+  },
+  {
+    question:"\\((-5)^{-2} + \\left(\\frac{5}{3}\\right)^{-3}\\)",
+    instruction:"다음을 구하여라.",
+    correct:"\\(\\frac{32}{125}\\)",
+    wrongs:["\\(\\frac{1}{25}\\)","\\(\\frac{27}{125}\\)","\\(\\frac{1}{5}\\)"]
+  },
+  {
+    question:"\\((-3)^{0} - 2^{-2}\\)",
+    instruction:"다음을 구하여라.",
+    correct:"\\(\\frac{3}{4}\\)",
+    wrongs:["\\(1\\)","\\(\\frac{1}{4}\\)","\\(2\\)"]
+  },
+  {
+    question:"\\(a^{3} \\times a^{4} \\div a^{9}\\)",
+    instruction:"\\(a>0\\)일 때, 다음을 간단히 하여라.",
+    correct:"\\(a^{-2}\\)",
+    wrongs:["\\(a^{2}\\)","\\(a^{-1}\\)","\\(a^{1/2}\\)"]
+  },
+  {
+    question:"\\((a^{-3})^{-4} \\div (a^{5})^{-3}\\)",
+    instruction:"\\(a>0\\)일 때, 다음을 간단히 하여라.",
+    correct:"\\(a^{27}\\)",
+    wrongs:["\\(a^{12}\\)","\\(a^{-12}\\)","\\(a^{15}\\)"]
+  },
+  {
+    question:"\\((a^{-2})^{5} \\times (a^{3})^{-4}\\)",
+    instruction:"\\(a>0\\)일 때, 다음을 간단히 하여라.",
+    correct:"\\(a^{-22}\\)",
+    wrongs:["\\(a^{22}\\)","\\(a^{-2}\\)","\\(a^{-1}\\)"]
+  },
+  {
+    question:"\\(a^{5} \\times a^{2} \\div a^{8}\\)",
+    instruction:"\\(a>0\\)일 때, 다음을 간단히 하여라.",
+    correct:"\\(a^{-1}\\)",
+    wrongs:["\\(a\\)","\\(a^{-2}\\)","\\(a^{1}\\)"]
+  },
+  {
+    question:"\\(\\frac{(a^{-5})^{2} \\times (a^{2})^{5}}{a^{2} \\times a^{-5}}\\)",
+    instruction:"\\(a>0\\)일 때, 다음을 간단히 하여라.",
+    correct:"\\(a^{3}\\)",
+    wrongs:["\\(a^{-3}\\)","\\(a^{0}\\)","\\(1\\)"]
+  },
+  {
+    question:"\\(\\frac{(a^{4})^{-3} \\times (a^{-2})^{-8}}{(a^{-7})^{3}}\\)",
+    instruction:"\\(a>0\\)일 때, 다음을 간단히 하여라.",
+    correct:"\\(a^{25}\\)",
+    wrongs:["\\(a^{4}\\)","\\(a^{12}\\)","\\(a^{-25}\\)"]
+  },
+  {
+    question:"\\((a^{5})^{-2} \\times (a^{-3})^{-4} \\div (a^{-2})^{2}\\)",
+    instruction:"\\(a>0\\)일 때, 다음을 간단히 하여라.",
+    correct:"\\(a^{6}\\)",
+    wrongs:["\\(a^{-6}\\)","\\(a^{12}\\)","\\(a^{3}\\)"]
+  },
+  {
+    question:"\\((a^{-4})^{2} \\times (a^{-5})^{-3} \\div a^{-5}\\)",
+    instruction:"\\(a>0\\)일 때, 다음을 간단히 하여라.",
+    correct:"\\(a^{12}\\)",
+    wrongs:["\\(a^{-12}\\)","\\(a^{15}\\)","\\(a^{2}\\)"]
+  },
+  {
+    question:"\\((a^{3})^{-2} \\times (a^{-5})^{-4} \\div (a^{-2})^{7}\\)",
+    instruction:"\\(a>0\\)일 때, 다음을 간단히 하여라.",
+    correct:"\\(a^{28}\\)",
+    wrongs:["\\(a^{-28}\\)","\\(a^{14}\\)","\\(a^{2}\\)"]
+  },
+  {
+    question:"\\(\\sqrt[3]{\\sqrt{a}}\\)",
+    instruction:"다음을 지수 형태로 나타내어라.",
+    correct:"\\(a^{\\frac{1}{6}}\\)",
+    wrongs:["\\(a^{\\frac{1}{3}}\\)","\\(a^{\\frac{1}{12}}\\)","\\(a^{\\frac{2}{3}}\\)"]
+  },
+  {
+    question:"\\(\\sqrt[3]{a\\sqrt{a}\\sqrt[5]{a}}\\)",
+    instruction:"다음을 지수 형태로 나타내어라.",
+    correct:"\\(a^{\\frac{17}{30}}\\)",
+    wrongs:["\\(a^{\\frac{1}{2}}\\)","\\(a^{\\frac{3}{5}}\\)","\\(a^{\\frac{19}{30}}\\)"]
+  },
+  {
+    question:"\\(\\sqrt[3]{\\sqrt{a}} \\times \\sqrt[5]{a}\\)",
+    instruction:"다음을 지수 형태로 나타내어라.",
+    correct:"\\(a^{\\frac{11}{30}}\\)",
+    wrongs:["\\(a^{\\frac{1}{6}}\\)","\\(a^{\\frac{1}{5}}\\)","\\(a^{\\frac{2}{15}}\\)"]
+  },
+  {
+    question:"\\(\\sqrt[4]{a \\sqrt[3]{a}}\\)",
+    instruction:"다음을 지수 형태로 나타내어라.",
+    correct:"\\(a^{\\frac{1}{3}}\\)",
+    wrongs:["\\(a^{\\frac{1}{4}}\\)","\\(a^{\\frac{2}{3}}\\)","\\(a^{\\frac{1}{12}}\\)"]
+  },
+  {
+    question:"\\(\\sqrt[4]{\\sqrt[3]{a}\\sqrt{a}}\\)",
+    instruction:"다음을 지수 형태로 나타내어라.",
+    correct:"\\(a^{\\frac{5}{24}}\\)",
+    wrongs:["\\(a^{\\frac{1}{8}}\\)","\\(a^{\\frac{1}{12}}\\)","\\(a^{\\frac{5}{12}}\\)"]
+  },
+  {
+    question:"\\(\\sqrt{a}\\sqrt[3]{a}\\sqrt[4]{a}\\)",
+    instruction:"다음을 지수 형태로 나타내어라.",
+    correct:"\\(a^{\\frac{13}{12}}\\)",
+    wrongs:["\\(a^{\\frac{1}{2}}\\)","\\(a^{\\frac{11}{12}}\\)","\\(a^{\\frac{15}{12}}\\)"]
+  },
+  {
+    question:"\\(\\sqrt{a^{3}}\\sqrt[3]{a^{4}}\\sqrt[4]{a^{3}}\\)",
+    instruction:"다음을 지수 형태로 나타내어라.",
+    correct:"\\(a^{\\frac{43}{12}}\\)",
+    wrongs:["\\(a^{\\frac{41}{12}}\\)","\\(a^{\\frac{3}{4}}\\)","\\(a^{\\frac{7}{12}}\\)"]
+  },
+  {
+    question:"\\(\\sqrt{9a}\\sqrt{a}\\sqrt[3]{a}\\)",
+    instruction:"다음을 지수 형태로 나타내어라.",
+    correct:"\\(3a^{\\frac{4}{3}}\\)",
+    wrongs:["\\(a^{\\frac{4}{3}}\\)","\\(3a^{\\frac{1}{3}}\\)","\\(3a^{\\frac{2}{3}}\\)"]
+  },
+  {
+    question:"\\(\\sqrt{a}\\sqrt{a^{2}}\\sqrt{a^{3}}\\)",
+    instruction:"다음을 지수 형태로 나타내어라.",
+    correct:"\\(a^{3}\\)",
+    wrongs:["\\(a^{2}\\)","\\(a^{\\frac{1}{2}}\\)","\\(a^{\\frac{5}{2}}\\)"]
+  },
+  {
+    question:"\\((a^{\\frac{1}{3}})^{-\\frac{3}{5}} \\times (a^{\\frac{3}{2}})^{\\frac{4}{9}}\\)",
+    instruction:"다음을 간단히 하여라.",
+    correct:"\\(a^{\\frac{7}{15}}\\)",
+    wrongs:["\\(a^{\\frac{7}{30}}\\)","\\(a^{\\frac{1}{15}}\\)","\\(a^{\\frac{2}{3}}\\)"]
+  },
+  {
+    question:"\\(a^{\\frac{1}{2}} \\times a^{-\\frac{2}{3}} \\div a^{\\frac{3}{4}}\\)",
+    instruction:"다음을 간단히 하여라.",
+    correct:"\\(a^{-\\frac{11}{12}}\\)",
+    wrongs:["\\(a^{\\frac{11}{12}}\\)","\\(a^{-1}\\)","\\(a^{-\frac{2}{3}}\\)"]
+  },
+  {
+    question:"\\(a^{\\frac{2}{5}} \\div a^{-\\frac{1}{2}}\\)",
+    instruction:"다음을 간단히 하여라.",
+    correct:"\\(a^{\\frac{9}{10}}\\)",
+    wrongs:["\\(a^{\\frac{1}{10}}\\)","\\(a^{\\frac{4}{5}}\\)","\\(a^{\\frac{9}{5}}\\)"]
+  },
+  {
+    question:"\\(a^{\\frac{1}{3}} \\times a^{\\frac{1}{2}}\\)",
+    instruction:"다음을 간단히 하여라.",
+    correct:"\\(a^{\\frac{5}{6}}\\)",
+    wrongs:["\\(a^{\\frac{1}{6}}\\)","\\(a^{\\frac{2}{3}}\\)","\\(a^{\\frac{1}{2}}\\)"]
+  },
+  {
+    question:"\\(a^{\\sqrt{2}} \\div a^{2\\sqrt{2}} \\times a^{\\sqrt{3}}\\)",
+    instruction:"다음을 간단히 하여라.",
+    correct:"\\(a^{\\sqrt{3}-\\sqrt{2}}\\)",
+    wrongs:["\\(a^{\\sqrt{3}+\\sqrt{2}}\\)","\\(a^{\\sqrt{2}-\\sqrt{3}}\\)","\\(a^{\\sqrt{2}}\\)"]
+  },
+  {
+    question:"\\(((a^{-\frac{3}{4}})^{2} \\times \\sqrt{a}) \\div a^{\\frac{3}{4}}\\)",
+    instruction:"다음을 간단히 하여라.",
+    correct:"\\(a^{-\frac{7}{4}}\\)",
+    wrongs:["\\(a^{\\frac{7}{4}}\\)","\\(a^{-1}\\)","\\(a^{-2}\\)"]
+  },
+  {
+    question:"\\(((\\sqrt{a^{3}}) \\times \\sqrt[5]{a} \\times a^{-\frac{1}{2}})^{\\frac{1}{3}}\\)",
+    instruction:"다음을 간단히 하여라.",
+    correct:"\\(a^{\\frac{2}{5}}\\)",
+    wrongs:["\\(a^{\\frac{1}{5}}\\)","\\(a^{\\frac{3}{5}}\\)","\\(a^{\\frac{6}{5}}\\)"]
+  },
+  {
+    question:"\\((\\sqrt[4]{a^3}\\times \\sqrt[3]{a^2}) \\div \\sqrt{a^5}\\)",
+    instruction:"다음을 지수 형태로 간단히 하여라. (\\(a>0\\))",
+    correct:"\\(a^{-\frac{13}{12}}\\)",
+    wrongs:["\\(a^{\frac{13}{12}}\\)","\\(a^{-\frac{1}{12}}\\)","\\(a^{-\frac{11}{12}}\\)"]
+  },
+  {
+    question:"\\((\\sqrt[4]{a^5}\\times \\sqrt{a^3}) \\div \\sqrt[3]{a^5}\\)",
+    instruction:"다음을 지수 형태로 간단히 하여라. (\\(a>0\\))",
+    correct:"\\(a^{\frac{13}{12}}\\)",
+    wrongs:["\\(a^{-\frac{13}{12}}\\)","\\(a^{\frac{11}{12}}\\)","\\(a^{1}\\)"]
+  },
+  {
+    question:"\\(a^{-\frac{1}{2}} \\div a^{\frac{1}{4}} \\times a^{\frac{3}{4}}\\)",
+    instruction:"다음을 간단히 하여라. (\\(a>0\\))",
+    correct:"\\(1\\)",
+    wrongs:["\\(a^{0}\\)","\\(a^{1}\\)","\\(a^{-1}\\)"]
+  },
+  {
+    question:"\\(((\\sqrt{a^3}) \\div \\sqrt[5]{a})^{\frac{1}{3}}\\)",
+    instruction:"다음을 지수 형태로 간단히 하여라. (\\(a>0\\))",
+    correct:"\\(a^{\frac{13}{30}}\\)",
+    wrongs:["\\(a^{\frac{1}{3}}\\)","\\(a^{\frac{2}{15}}\\)","\\(a^{\frac{13}{10}}\\)"]
+  },
+  {
+    question:"\\((\\sqrt[3]{a^2}\\times \\sqrt[4]{a^3})^{\frac{2}{3}}\\)",
+    instruction:"다음을 지수 형태로 간단히 하여라. (\\(a>0\\))",
+    correct:"\\(a^{\frac{17}{18}}\\)",
+    wrongs:["\\(a^{\frac{17}{12}}\\)","\\(a^{\frac{1}{2}}\\)","\\(a^{\frac{19}{18}}\\)"]
+  },
+  {
+    question:"\\(3\\sqrt{4\\sqrt{a^7}} \\times 4\\sqrt{3\\sqrt{a^5}}\\)",
+    instruction:"다음을 간단히 하여라. (\\(a>0\\))",
+    correct:"\\(a\\)",
+    wrongs:["\\(3a\\)","\\(4a\\)","\\(a^2\\)"]
+  },
+  {
+    // 여기에서 \(\frac{\sqrt[10]{a^{6}}}{(\sqrt[5]{a^{4}})^{2}}\) 문제는 삭제되었습니다.
+  },
+  {
+    question:"\\(\\sqrt[7]{a^{11}}\\times \\sqrt[14]{a^{6}}\\)",
+    instruction:"다음을 간단히 하여라. (\\(a>0\\))",
+    correct:"\\(a^{2}\\)",
+    wrongs:["\\(a^{\frac{11}{7}}\\)","\\(a^{\frac{17}{14}}\\)","\\(a^{\frac{1}{2}}\\)"]
+  },
+  {
+    question:"\\(a^{\\sqrt{3}}\\times a^{\\sqrt{12}}\\)",
+    instruction:"다음을 간단히 하여라.",
+    correct:"\\(a^{3\\sqrt{3}}\\)",
+    wrongs:["\\(a^{\sqrt{3}}\\)","\\(a^{4\\sqrt{3}}\\)","\\(a^{2\\sqrt{3}}\\)"]
+  },
+  {
+    question:"\\(a^{\\sqrt{32}}\\times a^{\\sqrt{8}} \\div a^{\\sqrt{18}}\\)",
+    instruction:"다음을 간단히 하여라.",
+    correct:"\\(a^{3\\sqrt{2}}\\)",
+    wrongs:["\\(a^{2\\sqrt{2}}\\)","\\(a^{4\\sqrt{2}}\\)","\\(a^{\sqrt{2}}\\)"]
+  },
+  {
+    question:"\\(((a^{\\frac{\\sqrt{3}}{2}})^{4}) \\div a^{\\sqrt{3}}\\)",
+    instruction:"다음을 간단히 하여라. (\\(a>0\\))",
+    correct:"\\(a^{\\sqrt{3}}\\)",
+    wrongs:["\\(a^{2\\sqrt{3}}\\)","\\(a^{\\frac{\\sqrt{3}}{2}}\\)","\\(a^{1}\\)"]
+  },
+  {
+    question:"\\(a^{-\\frac{\\sqrt{2}}{3}} \\times a^{-\\frac{2\\sqrt{2}}{3}} \\div a^{-3\\sqrt{2}}\\)",
+    instruction:"다음을 간단히 하여라. (\\(a>0\\))",
+    correct:"\\(a^{2\\sqrt{2}}\\)",
+    wrongs:["\\(a^{\\sqrt{2}}\\)","\\(a^{-2\\sqrt{2}}\\)","\\(a^{3\\sqrt{2}}\\)"]
+  },
+  {
+    question:"\\(a^{\\frac{1}{2}}b^{\\frac{1}{3}} \\div (a^{\\frac{2}{3}}b^{\\frac{1}{6}})\\)",
+    instruction:"\\(a>0,b>0\\)일 때, 다음을 간단히 하여라.",
+    correct:"\\(a^{-\frac{1}{6}}b^{\frac{1}{6}}\\)",
+    wrongs:["\\(a^{\frac{1}{6}}b^{\frac{1}{6}}\\)","\\(a^{-\frac{1}{3}}b^{\frac{1}{3}}\\)","\\(a^{-\frac{1}{6}}b^{-\frac{1}{6}}\\)"]
+  },
+  {
+    question:"\\(((a^{3}b^{2})^{\\frac{1}{12}}) \\times ((a^{\\frac{1}{3}}b^{\\frac{1}{4}})^{4})\\)",
+    instruction:"\\(a>0,b>0\\)일 때, 다음을 간단히 하여라.",
+    correct:"\\(a^{\\frac{19}{12}}b^{\\frac{7}{6}}\\)",
+    wrongs:["\\(a^{\frac{1}{12}}b^{\frac{1}{6}}\\)","\\(a^{\frac{19}{6}}b^{\frac{7}{12}}\\)","\\(a^{\frac{3}{4}}b^{\frac{7}{6}}\\)"]
+  },
+  {
+    question:"\\(\\sqrt[3]{ab^{2}} \\times \\sqrt[6]{ab^{5}} \\div \\sqrt{ab}\\)",
+    instruction:"\\(a>0,b>0\\)일 때, 다음을 간단히 하여라.",
+    correct:"\\(b\\)",
+    wrongs:["\\(a\\)","\\(ab\\)","\\(1\\)"]
+  },
+  {
+    question:"\\(\\sqrt[3]{\\sqrt[5]{a^{34}b^{6}}} \\div \\sqrt[5]{\\sqrt[3]{a^{4}b^{21}}}\\)",
+    instruction:"\\(a>0,b>0\\)일 때, 다음을 간단히 하여라.",
+    correct:"\\(\\frac{a^{2}}{b}\\)",
+    wrongs:["\\(a^{2}b\\)","\\(\\frac{1}{a^{2}b}\\)","\\(\\frac{a}{b^{2}}\\)"]
+  },
+  {
+    question:"\\(\\sqrt[3]{a^{2}b^{5}} \\div \\sqrt[4]{a^{5}b^{2}} \\times \\sqrt{a^{3}b}\\)",
+    instruction:"\\(a>0,b>0\\)일 때, 다음을 간단히 하여라.",
+    correct:"\\(a^{\\frac{11}{12}}b^{\\frac{5}{3}}\\)",
+    wrongs:["\\(a^{1}b^{1}\\)","\\(a^{\\frac{1}{2}}b^{2}\\)","\\(a^{\\frac{11}{12}}b^{\\frac{2}{3}}\\)"]
+  },
+  {
+    question:"\\((a^{2}\\sqrt{2} \\times b^{3}\\sqrt{2})^{\\frac{3}{\\sqrt{2}}}\\)",
+    instruction:"\\(a>0,b>0\\)일 때, 다음을 간단히 하여라.",
+    correct:"\\(2^{\\frac{3}{\\sqrt{2}}}a^{\\frac{6}{\\sqrt{2}}}b^{\\frac{9}{\\sqrt{2}}}\\)",
+    wrongs:["\\(2^{\\frac{1}{\\sqrt{2}}}a^{\\frac{3}{\\sqrt{2}}}b^{\\frac{9}{\\sqrt{2}}}\\)","\\(2^{3}a^{6}b^{9}\\)","\\(2^{\\frac{3}{2}}a^{3}b^{4}\\)"]
+  },
+  {
+    question:"\\(\\left(\\frac{a\\sqrt{3}}{b\\sqrt{18}}\\right)^{\\frac{2}{\\sqrt{6}}}\\)",
+    instruction:"\\(a>0,b>0\\)일 때, 다음을 간단히 하여라.",
+    correct:"\\(a^{\\frac{2}{\\sqrt{6}}}b^{-\frac{2}{\\sqrt{6}}}6^{-\frac{1}{\\sqrt{6}}}\\)",
+    wrongs:["\\(a^{\\frac{2}{\\sqrt{6}}}b^{\\frac{2}{\\sqrt{6}}}6^{\frac{1}{\\sqrt{6}}}\\)","\\(a^{-\frac{2}{\\sqrt{6}}}b^{\frac{2}{\\sqrt{6}}}6^{-\frac{1}{\\sqrt{6}}}\\)","\\(a^{2}b^{-2}6^{-1}\\)"]
+  },
+  {
+    question:"\\(((81)^{-\frac{1}{3}})^{\frac{9}{4}}\\)",
+    instruction:"다음을 구하여라.",
+    correct:"\\(\\frac{1}{27}\\)",
+    wrongs:["\\(27\\)","\\(\\frac{1}{9}\\)","\\(\\frac{1}{81}\\)"]
+  },
+  {
+    question:"\\( ((\\frac{3}{5})^{-\frac{5}{2}} )^{\frac{4}{5}} \\)",
+    instruction:"다음을 구하여라.",
+    correct:"\\(\\frac{25}{9}\\)",
+    wrongs:["\\(\\frac{9}{25}\\)","\\(\\frac{5}{3}\\)","\\(\\frac{3}{5}\\)"]
+  },
+  {
+    question:"\\(25^{-\frac{3}{2}} \\times 100^{\frac{3}{2}}\\)",
+    instruction:"다음을 구하여라.",
+    correct:"\\(8\\)",
+    wrongs:["\\(4\\)","\\(2\\)","\\(16\\)"]
+  },
+  {
+    question:"\\(9^{-\frac{3}{2}} \\times 36^{\frac{1}{2}}\\)",
+    instruction:"다음을 구하여라.",
+    correct:"\\(\\frac{2}{9}\\)",
+    wrongs:["\\(\\frac{1}{9}\\)","\\(\\frac{2}{3}\\)","\\(\\frac{1}{3}\\)"]
+  },
+  {
+    question:"\\(81^{-\frac{3}{4}} \\div 125^{-\frac{2}{3}}\\)",
+    instruction:"다음을 구하여라.",
+    correct:"\\(\\frac{25}{27}\\)",
+    wrongs:["\\(\\frac{27}{25}\\)","\\(\\frac{1}{27}\\)","\\(\\frac{1}{25}\\)"]
+  },
+  {
+    question:"\\(7^{\frac{5}{4}} \\times 7^{-\frac{3}{2}} \\div 7^{-2}\\)",
+    instruction:"다음을 간단히 하여라.",
+    correct:"\\(7^{\frac{7}{4}}\\)",
+    wrongs:["\\(7^{\frac{1}{4}}\\)","\\(7^{-\frac{7}{4}}\\)","\\(7^{\frac{3}{4}}\\)"]
+  },
+  {
+    question:"\\(32^{-\frac{3}{5}} \\div 27^{-\frac{2}{3}}\\)",
+    instruction:"다음을 구하여라.",
+    correct:"\\(\\frac{9}{8}\\)",
+    wrongs:["\\(\\frac{8}{9}\\)","\\(\\frac{3}{2}\\)","\\(\\frac{1}{8}\\)"]
+  },
+  {
+    question:"\\(16^{\frac{1}{4}} \\div 16^{\frac{1}{8}}\\)",
+    instruction:"다음을 간단히 하여라.",
+    correct:"\\(\\sqrt{2}\\)",
+    wrongs:["\\(2\\)","\\(\\frac{1}{\\sqrt{2}}\\)","\\(\\sqrt{4}\\)"]
+  },
+  {
+    question:"\\(((\\frac{3}{2})^{-\frac{4}{3}})^{\frac{9}{4}}\\)",
+    instruction:"다음을 구하여라.",
+    correct:"\\(\\frac{8}{27}\\)",
+    wrongs:["\\(\\frac{27}{8}\\)","\\(\\frac{4}{9}\\)","\\(\\frac{2}{3}\\)"]
+  },
+  {
+    question:"\\(5^{\frac{3}{5}} \\times 625^{\frac{1}{4}}\\)",
+    instruction:"다음을 간단히 하여라.",
+    correct:"\\(5^{\frac{8}{5}}\\)",
+    wrongs:["\\(5^{\frac{3}{5}}\\)","\\(5^{\frac{4}{5}}\\)","\\(5^{\frac{2}{5}}\\)"]
+  }
+];
+
+var difficulty = null;
+var score = 0;
+var lives = 3;
+var globalTime = 0;
+var totalTimeInterval = null;
+var energyInterval = null;
+var timeLimit = null; 
+var currentProblem = null;
+
+function pickRandomProblem() {
+  return problems[Math.floor(Math.random()*problems.length)];
+}
+
+function shuffle(array) {
+  for (let i=array.length-1;i>0;i--){
+    let j=Math.floor(Math.random()*(i+1));
+    [array[i],array[j]]=[array[j],array[i]];
+  }
+}
+
+function showProblem() {
+  currentProblem = pickRandomProblem();
+  document.getElementById('problem').innerHTML = currentProblem.instruction+"<br><span style='font-size:24px;'>"+currentProblem.question+"</span>";
+  var choicesContainer=document.getElementById('choices');
+  choicesContainer.innerHTML="";
+  var answers=[{text:currentProblem.correct,correct:true}];
+  currentProblem.wrongs.forEach(w=>answers.push({text:w,correct:false}));
+  shuffle(answers);
+  answers.forEach((a,idx)=>{
+    var btn=document.createElement('button');
+    btn.innerHTML=a.text;
+    btn.onclick=()=>checkAnswer(a.correct);
+    choicesContainer.appendChild(btn);
+  });
+  
+  if(timeLimit!==null) {
+    resetEnergy();
+    startEnergy();
+  }
+  
+  if (window.MathJax) {
+    MathJax.typesetPromise();
+  }
+}
+
+function checkAnswer(isCorrect) {
+  if(isCorrect) {
+    score+=scores[difficulty];
+    document.getElementById('score').innerHTML="점수: "+score;
+    var r=Math.random();
+    if(r<1/10000){
+      showPopup("축하합니다! \\(5000\\)원 상품권 당첨!");
+    } else if(r<1/1000){
+      showPopup("축하합니다! \\(3000\\)원 상품권 당첨!");
+    } else if(r<1/500){
+      showPopup("축하합니다! 1회 면제권 획득!");
+    }
+    showProblem();
+  } else {
+    lives--;
+    document.getElementById('lives').innerHTML="남은 기회: "+lives;
+    if(lives<=0){
+      showPopup("틀렸습니다!<br>정답: "+currentProblem.correct+"<br>게임 종료");
+      stopGame();
+      return;
+    } else {
+      showPopup("틀렸습니다!<br>정답: "+currentProblem.correct);
+      showProblem();
+    }
+  }
+}
+
+function showPopup(msg) {
+  document.getElementById('popup-content').innerHTML=msg;
+  document.getElementById('popup').style.display='block';
+  if (window.MathJax) {
+    MathJax.typesetPromise();
+  }
+}
+
+function closePopup(){
+  document.getElementById('popup').style.display='none';
+  if (window.MathJax) {
+    MathJax.typesetPromise();
+  }
+}
+
+function resetEnergy(){
+  var bar=document.querySelector('.energy-inner');
+  if(bar) bar.style.width='100%';
+}
+
+function startEnergy(){
+  var bar=document.querySelector('.energy-inner');
+  var start = performance.now();
+  if(energyInterval) clearInterval(energyInterval);
+  if(timeLimit!==null){
+    energyInterval=setInterval(()=>{
+      var elapsed=(performance.now()-start)/1000;
+      if(elapsed>=timeLimit){
+        clearInterval(energyInterval);
+        lives--;
+        document.getElementById('lives').innerHTML="남은 기회: "+lives;
+        if(lives<=0){
+          showPopup("시간 초과! 게임 종료");
+          stopGame();
+          return;
+        }else{
+          showProblem();
+        }
+      } else {
+        var ratio=(1-(elapsed/timeLimit))*100;
+        bar.style.width=ratio+"%";
+      }
+    },1000);
+  }
+}
+
+function startGame(diff) {
+  difficulty=diff;
+  timeLimit=timeLimits[diff];
+  score=0;
+  lives=3;
+  globalTime=0;
+  document.getElementById('score').innerHTML="점수: 0";
+  document.getElementById('lives').innerHTML="남은 기회: 3";
+  document.getElementById('global-time').innerHTML="총 경과 시간: 0초";
+  
+  document.getElementById('intro').style.display='none';
+  document.getElementById('game-area').style.display='block';
+  
+  if(totalTimeInterval) clearInterval(totalTimeInterval);
+  totalTimeInterval=setInterval(()=>{
+    globalTime++;
+    document.getElementById('global-time').innerHTML="총 경과 시간: "+globalTime+"초";
+  },1000);
+  
+  showProblem();
+}
+
+function stopGame(){
+  if(energyInterval) clearInterval(energyInterval);
+  if(totalTimeInterval) clearInterval(totalTimeInterval);
+  showPopup("게임이 종료되었습니다! 점수: "+score);
+}
+
+// 난이도 선택 버튼 이벤트
+document.querySelectorAll('.difficulty-select button').forEach(btn=>{
+  btn.addEventListener('click',function(){
+    startGame(this.getAttribute('data-diff'));
+  });
+});
+</script>
+</body>
+</html>
